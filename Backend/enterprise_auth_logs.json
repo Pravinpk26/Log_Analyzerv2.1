@@ -1,0 +1,134 @@
+[
+  {
+    "timestamp": "2026-07-07T09:10:15Z",
+    "username": "alice",
+    "status": "SUCCESS",
+    "ip": "49.207.116.84",
+    "country": "India",
+    "browser": "Chrome 138",
+    "os": "Windows 11",
+    "response_time": 420,
+    "risk_score": 8
+  },
+  {
+    "timestamp": "2026-07-07T09:12:42Z",
+    "username": "bob",
+    "status": "FAILED",
+    "ip": "185.220.101.24",
+    "country": "Russia",
+    "browser": "Tor Browser",
+    "os": "Linux",
+    "response_time": 3250,
+    "risk_score": 82
+  },
+  {
+    "timestamp": "2026-07-07T09:14:11Z",
+    "username": "charlie",
+    "status": "SUCCESS",
+    "ip": "34.124.55.91",
+    "country": "Singapore",
+    "browser": "Edge 138",
+    "os": "Windows 11",
+    "response_time": 610,
+    "risk_score": 18
+  },
+  {
+    "timestamp": "2026-07-07T09:16:20Z",
+    "username": "diana",
+    "status": "FAILED",
+    "ip": "91.198.174.192",
+    "country": "Germany",
+    "browser": "Firefox 139",
+    "os": "Ubuntu",
+    "response_time": 2900,
+    "risk_score": 74
+  },
+  {
+    "timestamp": "2026-07-07T09:18:07Z",
+    "username": "eric",
+    "status": "SUCCESS",
+    "ip": "103.21.244.0",
+    "country": "India",
+    "browser": "Chrome 138",
+    "os": "Android",
+    "response_time": 510,
+    "risk_score": 12
+  },
+  {
+    "timestamp": "2026-07-07T09:20:44Z",
+    "username": "frank",
+    "status": "FAILED",
+    "ip": "185.220.101.24",
+    "country": "Russia",
+    "browser": "Tor Browser",
+    "os": "Linux",
+    "response_time": 4050,
+    "risk_score": 91
+  },
+  {
+    "timestamp": "2026-07-07T09:23:13Z",
+    "username": "grace",
+    "status": "SUCCESS",
+    "ip": "52.95.245.10",
+    "country": "United States",
+    "browser": "Safari 18",
+    "os": "macOS",
+    "response_time": 390,
+    "risk_score": 9
+  },
+  {
+    "timestamp": "2026-07-07T09:25:52Z",
+    "username": "henry",
+    "status": "FAILED",
+    "ip": "203.0.113.25",
+    "country": "Japan",
+    "browser": "Firefox 139",
+    "os": "Windows 10",
+    "response_time": 2850,
+    "risk_score": 76
+  },
+  {
+    "timestamp": "2026-07-07T09:28:30Z",
+    "username": "isabella",
+    "status": "SUCCESS",
+    "ip": "196.11.240.1",
+    "country": "South Africa",
+    "browser": "Edge 138",
+    "os": "Windows 11",
+    "response_time": 470,
+    "risk_score": 11
+  },
+  {
+    "timestamp": "2026-07-07T09:31:02Z",
+    "username": "jack",
+    "status": "FAILED",
+    "ip": "45.32.12.156",
+    "country": "Netherlands",
+    "browser": "Chrome 138",
+    "os": "Linux",
+    "response_time": 3380,
+    "risk_score": 88
+  },
+  {
+    "timestamp": "2026-07-07T09:34:40Z",
+    "username": "alice",
+    "status": "FAILED",
+    "ip": "185.220.101.24",
+    "country": "Russia",
+    "browser": "Tor Browser",
+    "os": "Linux",
+    "response_time": 3900,
+    "risk_score": 95
+  },
+  {
+    "timestamp": "2026-07-07T09:37:18Z",
+    "username": "alice",
+    "status": "SUCCESS",
+    "ip": "49.207.116.84",
+    "country": "India",
+    "browser": "Chrome 138",
+    "os": "Windows 11",
+    "response_time": 410,
+    "risk_score": 7
+  }
+]

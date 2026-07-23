@@ -1,0 +1,23 @@
+[
+    {
+        "username": "admin",
+        "ip_address": "192.168.1.10",
+        "browser": "Chrome",
+        "timestamp": "2026-06-26 10:15:00",
+        "status": "Success"
+    },
+    {
+        "username": "admin",
+        "ip_address": "192.168.1.10",
+        "browser": "Chrome",
+        "timestamp": "2026-06-26 10:17:42",
+        "status": "Failed"
+    },
+    {
+        "username": "john",
+        "ip_address": "172.20.11.5",
+        "browser": "Edge",
+        "timestamp": "2026-06-26 11:04:15",
+        "status": "Success"
+    }
+]

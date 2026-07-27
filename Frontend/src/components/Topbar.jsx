@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { UploadCloud, Bell, Search, Loader2, ScanLine, RotateCcw, ChevronDown, LogOut, User } from 'lucide-react'
+import { UploadCloud, Bell, Search, Loader2, ScanLine, RotateCcw, ChevronDown, LogOut, User, MapPin, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { requestBrowserLocation, submitPreciseLocation } from '../lib/api'
 
 export default function Topbar({
   onScan,
@@ -14,6 +15,9 @@ export default function Topbar({
 }) {
   const [url, setUrl] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [locating, setLocating] = useState(false)
+  const [locationLabel, setLocationLabel] = useState(null)
+  const [locationError, setLocationError] = useState(null)
   const { user, logout } = useAuth()
 
   const busy = scanning || uploading || resetting
@@ -22,6 +26,29 @@ export default function Topbar({
     e.preventDefault()
     if (!url.trim() || scanning || uploading) return
     onScan(url.trim())
+  }
+
+  async function handleEnableLocation() {
+    setLocating(true)
+    setLocationError(null)
+    try {
+      // This runs in THIS tab, so the browser shows a real, clickable
+      // "Allow this site to know your location?" prompt — unlike the
+      // automated Playwright scan browser, which can't get past the
+      // OS-level permission dialog and silently falls back to
+      // city-level IP geolocation every time.
+      const coords = await requestBrowserLocation()
+      const result = await submitPreciseLocation(coords)
+      if (result.success) {
+        setLocationLabel(`${result.location.area}, ${result.location.city || result.location.state || ''}`)
+      } else {
+        setLocationError(result.message || 'Could not resolve a precise location.')
+      }
+    } catch (err) {
+      setLocationError(err.message || 'Location request failed.')
+    } finally {
+      setLocating(false)
+    }
   }
 
   return (
@@ -49,6 +76,28 @@ export default function Topbar({
       </form>
 
       <div className="flex items-center gap-3">
+        <button
+          onClick={handleEnableLocation}
+          disabled={locating}
+          title={
+            locationError
+              ? `Failed: ${locationError}`
+              : locationLabel
+              ? `Precise location set: ${locationLabel}. Click to refresh.`
+              : 'Grants a real location permission in this tab, so the next scan uses your exact area instead of city-level IP data.'
+          }
+          className="hidden lg:flex items-center gap-1.5 bg-panel border border-panel-border hover:border-brand-primary/40 text-ink-muted hover:text-ink text-[13px] font-medium px-3.5 py-2 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {locating ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : locationLabel ? (
+            <Check size={14} className="text-brand-green" />
+          ) : (
+            <MapPin size={14} />
+          )}
+          {locating ? 'Locating…' : locationLabel ? 'Precise location set' : 'Enable Precise Location'}
+        </button>
+
         <button
           onClick={onUploadClick}
           disabled={scanning}

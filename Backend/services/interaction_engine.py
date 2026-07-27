@@ -94,43 +94,107 @@ def interact_with_website(url):
             except Exception as exc:
                 nav_error = f"navigation_error: {exc}"
 
+            # ------------------------------------------------------------
+            # Ask the browser's own geolocation API for a precise fix.
+            # Unlike IP-address lookups (city-level at best), this uses
+            # the HOST MACHINE's real location services (Wi-Fi
+            # positioning / GPS), which can resolve to street/
+            # neighbourhood level. This only works if location services
+            # are enabled on the machine actually running this scan — on
+            # a headless server with no Wi-Fi/GPS, it will simply time
+            # out and return None, and the app falls back to city-level
+            # IP geolocation automatically.
+            # ------------------------------------------------------------
+            browser_geolocation = None
+            try:
+                origin = "/".join(url.split("/")[:3])
+                context.grant_permissions(["geolocation"], origin=origin)
+                browser_geolocation = page.evaluate(
+                    """
+                    () => new Promise((resolve) => {
+                        if (!navigator.geolocation) { resolve(null); return; }
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => resolve({
+                                latitude: pos.coords.latitude,
+                                longitude: pos.coords.longitude,
+                                accuracy: pos.coords.accuracy
+                            }),
+                            () => resolve(null),
+                            { timeout: 8000, maximumAge: 0 }
+                        );
+                    })
+                    """
+                )
+            except Exception:
+                browser_geolocation = None
+
             print("=" * 60)
-            print("Waiting for login to complete...")
+            print("Browser is open. Log in as normal — this stays open")
+            print("until YOU close the browser window.")
             print("=" * 60)
 
-            original_url = url
-            for _ in range(120):  # Wait up to 120 seconds
+            # ------------------------------------------------------------
+            # Wait for the user to close the browser themselves, instead
+            # of guessing when "login is complete". We keep refreshing a
+            # snapshot every second so that once the page/browser closes,
+            # we still have the last good state to analyze — a closed
+            # page can't be queried at all.
+            # ------------------------------------------------------------
+            MAX_WAIT_SECONDS = 1800  # 30-minute safety cap for an abandoned scan
+
+            last_known_url = url
+            last_known_html = ""
+            last_known_title = "Unknown"
+            last_known_cookies = []
+
+            elapsed = 0
+            closed_by_user = False
+
+            while elapsed < MAX_WAIT_SECONDS:
+                try:
+                    if page.is_closed():
+                        closed_by_user = True
+                        break
+
+                    last_known_url = page.url
+                    last_known_html = _safe_html(page)
+                    last_known_title = _safe_title(page)
+                    last_known_cookies = context.cookies()
+
+                except Exception:
+                    # Page/context became unusable mid-check (closing,
+                    # crashed, browser killed) — treat as user-closed.
+                    closed_by_user = True
+                    break
+
                 try:
                     page.wait_for_timeout(1000)
-                    if page.url != original_url:
-                        print("Login detected!")
-                        break
                 except Exception:
+                    closed_by_user = True
                     break
+
+                elapsed += 1
+
+            if closed_by_user:
+                print("Browser closed — finishing analysis.")
+            else:
+                print(f"Reached the {MAX_WAIT_SECONDS}s safety limit — closing automatically.")
 
             response_time = round((time.time() - start) * 1000)
 
-            html = _safe_html(page)
-            page_title = _safe_title(page)
+            html = last_known_html
+            page_title = last_known_title
             login_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             browser_name = browser.browser_type.name
-
-            try:
-                current_url = page.url
-            except Exception:
-                current_url = url
-
-            try:
-                cookie_list = context.cookies()
-            except Exception:
-                cookie_list = []
+            current_url = last_known_url
+            cookie_list = last_known_cookies
 
             session_cookie_count = len(cookie_list)
 
-            page_text = _safe_page_text(page)
+            page_text = html.lower()  # last_known_html already captured while page was live
 
             blocked_by_provider = any(
-                keyword in page_text or keyword in html.lower()
+                keyword in page_text
                 for keyword in BLOCKED_BY_PROVIDER_KEYWORDS
             )
 
@@ -169,6 +233,7 @@ def interact_with_website(url):
                 "session_cookie_count": session_cookie_count,
                 "login_success": login_success,
                 "blocked_by_provider": blocked_by_provider,
+                "closed_by_user": closed_by_user,
                 "scan_status": (
                     "blocked_by_provider" if blocked_by_provider
                     else "navigation_error" if nav_error
@@ -180,6 +245,10 @@ def interact_with_website(url):
                 "cookies": cookies,
                 "response_time": response_time,
                 "redirects": [],
+                # Raw GPS fix from the browser's own geolocation API, if
+                # available — reverse-geocoded into a neighbourhood-level
+                # place name by signal_collector.py.
+                "browser_geolocation": browser_geolocation,
                 # NOTE: "html" is kept for internal signal-collection only —
                 # it is stripped out before anything is returned to the API
                 # response (see signal_collector.py) and is never JSON-
@@ -188,7 +257,12 @@ def interact_with_website(url):
                 "soup": soup,
             }
 
-            browser.close()
+            try:
+                if not page.is_closed():
+                    browser.close()
+            except Exception:
+                pass
+
             return result
 
     except Exception as exc:

@@ -50,6 +50,10 @@ export function aggregateByIp(events, topN = 5) {
         ip,
         country: 'Unknown',
         city: 'Unknown',
+        area: null,
+        organization: null,
+        isHosting: false,
+        isProxy: false,
         total: 0,
         failed: 0,
         lastSeen: ev.timestamp || '',
@@ -67,12 +71,22 @@ export function aggregateByIp(events, topN = 5) {
     // of locking in whatever the first occurrence happened to have.
     const evCountry = ev?.geo?.country
     const evCity = ev?.geo?.city
+    const evArea = ev?.geo?.area
+    const evOrg = ev?.geo?.organization || ev?.geo?.isp
     if (evCountry && evCountry !== 'Unknown' && bucket.country === 'Unknown') {
       bucket.country = evCountry
     }
     if (evCity && evCity !== 'Unknown' && bucket.city === 'Unknown') {
       bucket.city = evCity
     }
+    if (evArea && !bucket.area) {
+      bucket.area = evArea
+    }
+    if (evOrg && evOrg !== 'Unknown' && !bucket.organization) {
+      bucket.organization = evOrg
+    }
+    if (ev?.geo?.is_hosting) bucket.isHosting = true
+    if (ev?.geo?.is_proxy) bucket.isProxy = true
   }
 
   const rows = Array.from(byIp.values()).map((r) => {

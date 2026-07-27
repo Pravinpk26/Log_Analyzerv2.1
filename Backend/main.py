@@ -1,11 +1,14 @@
 from dotenv import load_dotenv
 load_dotenv()  # loads Backend/.env (GEMINI_API_KEY, etc.) if present
 
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from services.interaction_engine import interact_with_website
 from services.signal_collector import collect_signals
+from services.precise_location_service import reverse_geocode
 from services.Log_categorizer import categorize_logs
 from services.security_score import calculate_security_score
 from services.risk_engine import calculate_risk_score
@@ -52,6 +55,62 @@ app.add_middleware(
 )
 
 
+# In-memory cache for the most recent precise (browser-reported)
+# location, submitted from the dashboard's own tab via /precise-location.
+# This is far more reliable than trying to get Playwright's automated
+# browser to obtain OS-level location permission (that native OS dialog
+# can't be clicked by automation and will just time out). A regular
+# browser tab shows a real "Allow location?" prompt the person can
+# actually click, which is what this endpoint is for.
+_precise_location_cache = {"data": None, "set_at": None}
+PRECISE_LOCATION_MAX_AGE_SECONDS = 600  # treat as stale after 10 minutes
+
+
+class PreciseLocationPayload(BaseModel):
+    latitude: float
+    longitude: float
+    accuracy: float | None = None
+
+
+@app.post("/precise-location")
+def set_precise_location(payload: PreciseLocationPayload):
+    """
+    Called from the dashboard's own browser tab (not the automated
+    Playwright scan) after the user grants a real geolocation permission
+    prompt. Reverse-geocodes the coordinates into a neighbourhood-level
+    place name and caches it so the next /scan can attach it to the
+    resulting event instead of only city-level IP geolocation.
+    """
+
+    precise = reverse_geocode(payload.latitude, payload.longitude)
+
+    if not precise:
+        return {
+            "success": False,
+            "message": "Could not resolve a neighbourhood-level location for these coordinates.",
+        }
+
+    precise["location_accuracy_meters"] = payload.accuracy
+
+    _precise_location_cache["data"] = precise
+    _precise_location_cache["set_at"] = time.time()
+
+    return {"success": True, "location": precise}
+
+
+@app.get("/precise-location")
+def get_precise_location():
+    """Returns the currently cached precise location, if any and not stale."""
+
+    data = _precise_location_cache["data"]
+    set_at = _precise_location_cache["set_at"]
+
+    if not data or not set_at or (time.time() - set_at) > PRECISE_LOCATION_MAX_AGE_SECONDS:
+        return {"location": None}
+
+    return {"location": data, "age_seconds": round(time.time() - set_at)}
+
+
 def _analyze_all_events(events, statistics):
     """
     Runs both detection engines across every stored event (not just the
@@ -95,6 +154,21 @@ def scan(url: str):
 
     # Step 2
     signals = collect_signals(raw_data)
+
+    # Step 2.5 — If the dashboard's own browser tab has recently reported
+    # a precise (real permission-granted) location via /precise-location,
+    # it's more trustworthy than city-level IP geolocation or the
+    # automated Playwright browser's location attempt (which usually
+    # can't get past the OS-level permission dialog). Layer it on top.
+    cached_precise = _precise_location_cache["data"]
+    cached_set_at = _precise_location_cache["set_at"]
+    if cached_precise and cached_set_at and (time.time() - cached_set_at) <= PRECISE_LOCATION_MAX_AGE_SECONDS:
+        signals["geo_information"] = {
+            **signals.get("geo_information", {}),
+            **cached_precise,
+            "location_source": "browser_geolocation",
+            "location_confidence": 95,
+        }
 
     # Step 3
     authentication_event = create_authentication_event(signals)
@@ -206,7 +280,7 @@ def scan(url: str):
         # truth (previously exposed under the "risk" key).
         "risk": security_posture,
 
-        "results": categorized_logs,
+        "results": signals,
 
         "authentication_event": authentication_event,
 

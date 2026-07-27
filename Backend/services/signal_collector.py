@@ -1,6 +1,7 @@
 import socket
 
 from services.geo_service import GeoService
+from services.precise_location_service import reverse_geocode
 
 
 def collect_signals(data):
@@ -18,9 +19,17 @@ def collect_signals(data):
     hostname = data["url"].split("//")[-1].split("/")[0]
 
     try:
-        ip_address = socket.gethostbyname(hostname)
+        target_server_ip = socket.gethostbyname(hostname)
     except:
-        ip_address = "Unknown"
+        target_server_ip = "Unknown"
+
+    # This is the important one for security analysis: the IP of the
+    # machine actually performing the login (i.e. wherever this scan is
+    # physically running from), NOT the target website's server IP.
+    # Geolocating the target's DNS-resolved IP was showing the site's
+    # hosting data center (e.g. Azure/GitHub's infrastructure) as if it
+    # were the login's origin, which is a different thing entirely.
+    client_ip_address = GeoService.get_public_ip()
 
     dns_information = hostname
 
@@ -44,7 +53,15 @@ def collect_signals(data):
 
         "tls_version": headers.get("X-TLS-Version", "Unknown"),
 
-        "ip_address": ip_address,
+        # The actual login-origin IP — this is what geolocation and
+        # threat detection (impossible travel, suspicious IP, etc.)
+        # should use.
+        "ip_address": client_ip_address,
+
+        # The scanned site's own server IP — kept separately, purely
+        # informational (e.g. for DNS/network diagnostics), and should
+        # NEVER be geolocated as if it were the login's origin.
+        "target_server_ip": target_server_ip,
 
         "dns_information": dns_information,
 
@@ -57,7 +74,33 @@ def collect_signals(data):
     # GEO INFORMATION
     # --------------------------
 
-    geo_information = GeoService.get_location(ip_address)
+    geo_information = GeoService.get_location(client_ip_address)
+
+    # If the browser was able to get a real GPS/Wi-Fi-based fix (see
+    # interaction_engine.py), reverse-geocode it for neighbourhood-level
+    # detail and layer it on top of the city-level IP data. This is
+    # additive and best-effort — if it's unavailable (denied permission,
+    # no location services on this machine, offline geocoding service),
+    # geo_information simply stays at its IP-based city-level accuracy.
+    browser_geolocation = data.get("browser_geolocation")
+    if browser_geolocation:
+        precise = reverse_geocode(
+            browser_geolocation.get("latitude"),
+            browser_geolocation.get("longitude"),
+        )
+        if precise:
+            geo_information = {
+                **geo_information,
+                "area": precise.get("area"),
+                "road": precise.get("road"),
+                "precise_latitude": precise.get("latitude"),
+                "precise_longitude": precise.get("longitude"),
+                "location_accuracy_meters": browser_geolocation.get("accuracy"),
+                "location_source": "browser_geolocation",
+                # A real device-reported GPS/Wi-Fi fix is much more
+                # trustworthy than an IP-database guess.
+                "location_confidence": 95,
+            }
 
     # --------------------------
     # SECURITY SIGNALS

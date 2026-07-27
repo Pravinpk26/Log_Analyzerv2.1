@@ -52,6 +52,42 @@ export function fetchAIInsights() {
   return fetch(`${getApiBase()}/ai-insights`).then(handle)
 }
 
+// POST /precise-location {latitude, longitude, accuracy} -> reverse-geocoded
+// neighbourhood-level location, used by the next /scan call.
+export function submitPreciseLocation(coords) {
+  return fetch(`${getApiBase()}/precise-location`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(coords),
+  }).then(handle)
+}
+
+// GET /precise-location -> currently cached precise location, if any
+export function fetchPreciseLocation() {
+  return fetch(`${getApiBase()}/precise-location`).then(handle)
+}
+
+// Requests location from THIS browser tab (a real permission prompt the
+// user can click "Allow" on) — unlike the automated Playwright browser,
+// which can't get past the OS-level permission dialog at all.
+export function requestBrowserLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by this browser.'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      }),
+      (err) => reject(new Error(err.message || 'Location permission denied.')),
+      { timeout: 10000, maximumAge: 0 },
+    )
+  })
+}
+
 // POST /upload-log (multipart file: .json or .csv), with real upload progress
 // via XMLHttpRequest (fetch doesn't expose upload progress events).
 export function uploadLogFile(file, onProgress) {

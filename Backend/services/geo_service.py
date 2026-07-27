@@ -23,6 +23,39 @@ class GeoService:
         "timezone,lat,lon,isp,org,as,mobile,proxy,hosting,query"
     )
 
+    _public_ip_cache = None
+
+    @staticmethod
+    def get_public_ip() -> str:
+        """
+        Returns the real public IP of the machine running this scan —
+        i.e. wherever the login is actually being performed from. This
+        is DIFFERENT from resolving the target website's own server IP
+        (socket.gethostbyname(target_hostname)), which tells you where
+        the site is hosted, not where the person logging in is located.
+        Cached for the life of the process since it won't change mid-run.
+        """
+
+        if GeoService._public_ip_cache:
+            return GeoService._public_ip_cache
+
+        # Try a couple of lightweight, free IP-echo services in case one
+        # is unreachable/down — never raises, falls back to "Unknown".
+        for endpoint, parse_json in (
+            ("https://api.ipify.org?format=json", True),
+            ("https://ifconfig.me/ip", False),
+        ):
+            try:
+                response = requests.get(endpoint, timeout=5)
+                ip = response.json()["ip"] if parse_json else response.text.strip()
+                if ip:
+                    GeoService._public_ip_cache = ip
+                    return ip
+            except Exception:
+                continue
+
+        return "Unknown"
+
     @staticmethod
     def get_location(ip_address: str) -> dict:
         """

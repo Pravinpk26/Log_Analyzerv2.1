@@ -107,6 +107,7 @@ def normalize_event(event):
                 "latitude": event.get("latitude") if has_explicit_geo else looked_up.get("latitude"),
                 "longitude": event.get("longitude") if has_explicit_geo else looked_up.get("longitude"),
                 "isp": geo_field("isp"),
+                "organization": (looked_up or {}).get("organization", "Unknown") if not has_explicit_geo else event.get("organization", "Unknown"),
                 "is_proxy": _coerce_bool(event.get("is_proxy")) if has_explicit_geo or "is_proxy" in event else (looked_up.get("is_proxy", False)),
                 "is_hosting": _coerce_bool(event.get("is_hosting")) if has_explicit_geo or "is_hosting" in event else (looked_up.get("is_hosting", False)),
                 "location_confidence": (looked_up or {}).get("location_confidence", 100 if has_explicit_geo else 0),
@@ -179,6 +180,8 @@ def normalize_event(event):
             "longitude": v2_geo_field("longitude"),
 
             "isp": v2_geo_field("isp", "Unknown"),
+
+            "organization": v2_geo_field("organization", "Unknown"),
 
             "is_proxy": geo.get("is_proxy") if "is_proxy" in geo else (looked_up or {}).get("is_proxy", False),
 
